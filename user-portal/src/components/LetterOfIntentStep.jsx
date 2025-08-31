@@ -103,24 +103,26 @@ export default function LetterOfIntentForm() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-
       if (!user) throw new Error("User not authenticated");
 
-      // Ensure unique code is truly unique
+      // Generate unique code
       let uniqueCode = generateUniqueCode(8);
       let tries = 0;
       const maxTries = 10;
       while (tries < maxTries) {
-        const exists = await checkUniqueCodeExists(uniqueCode);
-        if (!exists) break;
+        const exists = await supabase
+          .from("letters_of_intent")
+          .select("unique_code")
+          .eq("unique_code", uniqueCode)
+          .limit(1);
+        if (exists.data.length === 0) break;
         uniqueCode = generateUniqueCode(8);
         tries++;
       }
-      if (tries === maxTries)
-        throw new Error("Failed to generate unique code. Please try again.");
+      if (tries === maxTries) throw new Error("Could not generate unique code");
 
       const insertData = {
-        user_id: user.id,
+        user_id: user.id, // <-- crucial for admin approval
         first_name: form.firstName.trim(),
         middle_name: form.middleName.trim() || null,
         last_name: form.lastName.trim(),
@@ -141,7 +143,8 @@ export default function LetterOfIntentForm() {
         aspirant_signature: form.aspirantSignature.trim(),
         application_received_date: getTodayDate(),
         unique_code: uniqueCode,
-        // approved, submitted_at, uuid are handled by DB defaults
+        approved: false, // <-- new submissions are pending
+        submitted_at: new Date(), // <-- timestamp
       };
 
       const { error: insertError } = await supabase
@@ -151,7 +154,7 @@ export default function LetterOfIntentForm() {
       if (insertError) throw insertError;
 
       setMessage(
-        `Letter of Intent submitted successfully. Your unique code is: ${uniqueCode}. Please keep this code safe and bring it to the admin for approval.`
+        `Letter of Intent submitted successfully! Your unique code: ${uniqueCode}. Wait for admin approval to proceed.`
       );
 
       setForm({

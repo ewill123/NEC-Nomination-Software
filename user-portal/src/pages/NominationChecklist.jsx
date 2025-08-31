@@ -24,7 +24,7 @@ export default function NominationChecklist() {
     "Notarized Letter of Authorization to Verify Indemnity Insurance Bond",
   ];
 
-  function handleNext() {
+  function handleStart() {
     navigate("/nomination-form");
   }
 
@@ -35,16 +35,22 @@ export default function NominationChecklist() {
   return (
     <div style={styles.container}>
       <h1 style={styles.heading}>Nomination Application Checklist</h1>
-      <p style={styles.note}>
-        <strong>Important Legal Notice:</strong> This checklist constitutes a
-        legal declaration of the necessary documents and requirements for
-        nomination. Ensure all items listed are complete and accurate before
-        proceeding with your application.
-      </p>
+
+      <div style={styles.noticeBox}>
+        <strong>Important Legal Notice:</strong>
+        This checklist constitutes a legal declaration of the necessary
+        documents and requirements for nomination. Ensure all items listed are
+        complete and accurate before starting.
+      </div>
 
       <p style={styles.intro}>
-        Please review the following documents carefully. These are required to
-        complete your nomination application:
+        Please review the following documents carefully. Once you are ready,
+        click
+        <span style={{ fontWeight: "600", color: "#0055A4" }}>
+          {" "}
+          "Start the Nomination Process"
+        </span>
+        to begin your official application.
       </p>
 
       <ul style={styles.list}>
@@ -59,8 +65,8 @@ export default function NominationChecklist() {
         <button style={styles.printButton} onClick={handlePrint}>
           Print Checklist
         </button>
-        <button style={styles.nextButton} onClick={handleNext}>
-          Next: Start Nomination Application
+        <button style={styles.nextButton} onClick={handleStart}>
+          Start the Nomination Process
         </button>
       </div>
     </div>
@@ -71,7 +77,7 @@ const styles = {
   container: {
     maxWidth: 720,
     margin: "2rem auto",
-    padding: "1rem 2rem",
+    padding: "1.5rem 2rem",
     fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
     color: "#003366",
     backgroundColor: "#f9fafe",
@@ -84,18 +90,20 @@ const styles = {
     marginBottom: 16,
     textAlign: "center",
   },
-  note: {
+  noticeBox: {
     backgroundColor: "#FFFBCC",
     border: "1px solid #FFEB3B",
-    padding: "12px 16px",
+    padding: "14px 18px",
     borderRadius: 8,
     fontWeight: "600",
     color: "#665c00",
     marginBottom: 24,
+    lineHeight: 1.5,
   },
   intro: {
     fontSize: 16,
     marginBottom: 16,
+    lineHeight: 1.6,
   },
   list: {
     listStyleType: "disc",

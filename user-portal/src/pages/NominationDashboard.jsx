@@ -1,3 +1,4 @@
+// src/pages/NominationDashboard.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import PartyDocs from "../components/PartyDocs";
@@ -18,11 +19,9 @@ export default function NominationDashboard() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState(null);
 
-  const [letterApproved, setLetterApproved] = useState(false);
-  const [loadingApproval, setLoadingApproval] = useState(true);
-
   const navigate = useNavigate();
 
+  // Fetch user profile on mount
   useEffect(() => {
     async function fetchProfile() {
       setLoadingProfile(true);
@@ -41,7 +40,7 @@ export default function NominationDashboard() {
         .eq("id", user.id)
         .single();
 
-      if (error) {
+      if (error || !data) {
         setUserProfile({ name: "", email: user.email, avatar_url: null });
       } else {
         setUserProfile({
@@ -56,44 +55,15 @@ export default function NominationDashboard() {
     fetchProfile();
   }, [navigate]);
 
-  // Check Letter of Intent approval status
-  useEffect(() => {
-    async function checkApproval() {
-      setLoadingApproval(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        navigate("/"); // redirect if no user
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("letters_of_intent")
-        .select("approved")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!error && data?.approved) {
-        setLetterApproved(true);
-      } else {
-        setLetterApproved(false);
-      }
-      setLoadingApproval(false);
-    }
-
-    checkApproval();
-  }, [navigate]);
-
   const tabs = [
     { key: "party", label: "Party Document Submission" },
     { key: "nomination", label: "Nomination Process" },
-    { key: "questionnaire", label: "Questionnaire" }, // NEW TAB
+    { key: "questionnaire", label: "Aspirant Questionnaire" },
     { key: "profile", label: "Edit Profile" },
     { key: "password", label: "Reset Password" },
   ];
 
+  // Handle user logout
   async function handleLogout() {
     setLoggingOut(true);
     setLogoutError(null);
@@ -176,17 +146,7 @@ export default function NominationDashboard() {
         <section style={styles.contentSection}>
           {activeTab === "party" && <PartyDocs />}
           {activeTab === "nomination" && <NominationForm />}
-          {activeTab === "questionnaire" &&
-            (loadingApproval ? (
-              <p>Checking approval status...</p>
-            ) : letterApproved ? (
-              <AspirantQuestionnaire />
-            ) : (
-              <p style={{ color: "#D72631", fontWeight: "600" }}>
-                Your Letter of Intent has not been approved yet. Please wait for
-                admin approval before accessing the questionnaire.
-              </p>
-            ))}
+          {activeTab === "questionnaire" && <AspirantQuestionnaire />}
           {activeTab === "profile" && <ProfileEditor />}
           {activeTab === "password" && <PasswordReset />}
         </section>

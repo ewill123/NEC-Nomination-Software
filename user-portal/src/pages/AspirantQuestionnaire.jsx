@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "../utils/supabaseClient";
+import CandidateFinancialDisclosureForm from "./CandidateFinancialDisclosureForm"; // <-- new form
 
-export default function AspirantQuestionnaire({ userId, onSubmitSuccess }) {
+export default function AspirantQuestionnaire({ onSubmitSuccess }) {
+  const [user, setUser] = useState(null); // Supabase user
   const [form, setForm] = useState({
     currentAddress: "",
     currentAddressDuration: {
@@ -31,8 +33,16 @@ export default function AspirantQuestionnaire({ userId, onSubmitSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
+  const [showNextForm, setShowNextForm] = useState(false);
 
-  // ---- Form Handlers ----
+  // Fetch logged-in user
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUser(user);
+      else setError("You must be logged in to submit this form.");
+    });
+  }, []);
+
   const handleChange = (e) =>
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   const handleNestedChange = (section, field, value) =>
@@ -45,6 +55,7 @@ export default function AspirantQuestionnaire({ userId, onSubmitSuccess }) {
     updated[index][field] = value;
     setForm((prev) => ({ ...prev, [section]: updated }));
   };
+
   const addPreviousAddress = () =>
     setForm((prev) => ({
       ...prev,
@@ -72,8 +83,11 @@ export default function AspirantQuestionnaire({ userId, onSubmitSuccess }) {
       govtPositions: prev.govtPositions.filter((_, idx) => idx !== i),
     }));
 
-  // ---- Validation ----
   function validate() {
+    if (!user) {
+      setError("You must be logged in to submit this form.");
+      return false;
+    }
     if (
       !form.currentAddress.trim() ||
       !form.currentAddressDuration.startDate ||
@@ -107,7 +121,6 @@ export default function AspirantQuestionnaire({ userId, onSubmitSuccess }) {
     return true;
   }
 
-  // ---- Submit ----
   async function handleSubmit(e) {
     e.preventDefault();
     if (!validate()) return;
@@ -118,7 +131,7 @@ export default function AspirantQuestionnaire({ userId, onSubmitSuccess }) {
 
     try {
       const insertData = {
-        user_id: userId,
+        user_id: user.id,
         current_address: form.currentAddress.trim(),
         current_address_duration_years:
           form.currentAddressDuration.years || null,
@@ -148,6 +161,7 @@ export default function AspirantQuestionnaire({ userId, onSubmitSuccess }) {
       if (insertError) throw insertError;
 
       setMessage("✅ Questionnaire submitted successfully.");
+      setShowNextForm(true);
       if (onSubmitSuccess) onSubmitSuccess();
     } catch (err) {
       setError(err.message || "Submission failed.");
@@ -156,301 +170,326 @@ export default function AspirantQuestionnaire({ userId, onSubmitSuccess }) {
     }
   }
 
+  if (!user)
+    return (
+      <p style={styles.error}>You must be logged in to submit this form.</p>
+    );
+
   return (
     <div style={styles.container}>
-      <h2>Aspirant Questionnaire to Establish Residency & Compliance</h2>
-      <form onSubmit={handleSubmit} style={styles.form} noValidate>
-        {/* Current Address */}
-        <label>
-          1. Current home address <span style={styles.required}>*</span>
-          <textarea
-            name="currentAddress"
-            value={form.currentAddress}
-            onChange={handleChange}
-            required
-            style={styles.textarea}
-          />
-        </label>
+      <h2>
+        Aspirant Questionnaire to Establish Residency, Domicile & Compliance
+      </h2>
 
-        {/* Current Address Duration */}
-        <fieldset style={styles.fieldset}>
-          <legend>
-            2. Duration at current address{" "}
+      {!showNextForm ? (
+        <form onSubmit={handleSubmit} style={styles.form} noValidate>
+          {/* Current Address */}
+          <label>
+            1. Current home address (Street, Suburb, City/Town, County)
             <span style={styles.required}>*</span>
-          </legend>
-          <div style={styles.durationRow}>
-            {["years", "months", "days"].map((unit) => (
-              <label key={unit}>
-                {unit.charAt(0).toUpperCase() + unit.slice(1)}:{" "}
+            <textarea
+              name="currentAddress"
+              value={form.currentAddress}
+              onChange={handleChange}
+              required
+              style={styles.textarea}
+            />
+          </label>
+
+          {/* Current Address Duration */}
+          <fieldset style={styles.fieldset}>
+            <legend>
+              2. Duration at current address (Exact number of years/months/days){" "}
+              <span style={styles.required}>*</span>
+            </legend>
+            <div style={styles.durationRow}>
+              {["years", "months", "days"].map((unit) => (
+                <label key={unit}>
+                  {unit.charAt(0).toUpperCase() + unit.slice(1)}:
+                  <input
+                    type="number"
+                    min="0"
+                    max={
+                      unit === "months" ? 11 : unit === "days" ? 31 : undefined
+                    }
+                    value={form.currentAddressDuration[unit]}
+                    onChange={(e) =>
+                      handleNestedChange(
+                        "currentAddressDuration",
+                        unit,
+                        e.target.value
+                      )
+                    }
+                    style={styles.smallInput}
+                  />
+                </label>
+              ))}
+            </div>
+            <div style={styles.dateRow}>
+              <label>
+                Start Date <span style={styles.required}>*</span>
                 <input
-                  type="number"
-                  min="0"
-                  max={
-                    unit === "months" ? 11 : unit === "days" ? 31 : undefined
-                  }
-                  value={form.currentAddressDuration[unit]}
+                  type="date"
+                  value={form.currentAddressDuration.startDate}
                   onChange={(e) =>
                     handleNestedChange(
                       "currentAddressDuration",
-                      unit,
+                      "startDate",
                       e.target.value
                     )
                   }
-                  style={styles.smallInput}
+                  style={styles.dateInput}
                 />
               </label>
+              <label>
+                End Date <span style={styles.required}>*</span>
+                <input
+                  type="date"
+                  value={form.currentAddressDuration.endDate}
+                  onChange={(e) =>
+                    handleNestedChange(
+                      "currentAddressDuration",
+                      "endDate",
+                      e.target.value
+                    )
+                  }
+                  style={styles.dateInput}
+                />
+              </label>
+            </div>
+          </fieldset>
+
+          {/* Previous Addresses */}
+          <fieldset style={styles.fieldset}>
+            <legend>
+              3 & 4. Previous addresses last 1 year (most recent first){" "}
+              <span style={styles.required}>*</span>
+            </legend>
+            {form.previousAddresses.map((addr, idx) => (
+              <div key={idx} style={styles.previousAddressBlock}>
+                <textarea
+                  value={addr.address}
+                  onChange={(e) =>
+                    handleArrayChange(
+                      "previousAddresses",
+                      idx,
+                      "address",
+                      e.target.value
+                    )
+                  }
+                  required
+                  style={styles.textarea}
+                  placeholder="Previous Address"
+                />
+                <div style={styles.dateRow}>
+                  <input
+                    type="date"
+                    value={addr.startDate}
+                    onChange={(e) =>
+                      handleArrayChange(
+                        "previousAddresses",
+                        idx,
+                        "startDate",
+                        e.target.value
+                      )
+                    }
+                    required
+                    style={styles.dateInput}
+                  />
+                  <input
+                    type="date"
+                    value={addr.endDate}
+                    onChange={(e) =>
+                      handleArrayChange(
+                        "previousAddresses",
+                        idx,
+                        "endDate",
+                        e.target.value
+                      )
+                    }
+                    required
+                    style={styles.dateInput}
+                  />
+                  {form.previousAddresses.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removePreviousAddress(idx)}
+                      style={styles.removeBtn}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
             ))}
-          </div>
-          <div style={styles.dateRow}>
-            <label>
-              Start Date <span style={styles.required}>*</span>
-              <input
-                type="date"
-                value={form.currentAddressDuration.startDate}
-                onChange={(e) =>
-                  handleNestedChange(
-                    "currentAddressDuration",
-                    "startDate",
-                    e.target.value
-                  )
-                }
-                style={styles.dateInput}
-              />
-            </label>
-            <label>
-              End Date <span style={styles.required}>*</span>
-              <input
-                type="date"
-                value={form.currentAddressDuration.endDate}
-                onChange={(e) =>
-                  handleNestedChange(
-                    "currentAddressDuration",
-                    "endDate",
-                    e.target.value
-                  )
-                }
-                style={styles.dateInput}
-              />
-            </label>
-          </div>
-        </fieldset>
+            <button
+              type="button"
+              onClick={addPreviousAddress}
+              style={styles.addBtn}
+            >
+              + Add Previous Address
+            </button>
+          </fieldset>
 
-        {/* Previous Addresses */}
-        <fieldset style={styles.fieldset}>
-          <legend>
-            3 & 4. Previous addresses last 1 year{" "}
-            <span style={styles.required}>*</span>
-          </legend>
-          {form.previousAddresses.map((addr, idx) => (
-            <div key={idx} style={styles.previousAddressBlock}>
-              <textarea
-                value={addr.address}
-                onChange={(e) =>
-                  handleArrayChange(
-                    "previousAddresses",
-                    idx,
-                    "address",
-                    e.target.value
-                  )
-                }
-                required
-                style={styles.textarea}
-              />
-              <div style={styles.dateRow}>
+          {/* Government Positions */}
+          <fieldset style={styles.fieldset}>
+            <legend>5. Government positions held in last 3 years</legend>
+            {form.govtPositions.map((pos, idx) => (
+              <div key={idx} style={styles.previousAddressBlock}>
                 <input
-                  type="date"
-                  value={addr.startDate}
-                  onChange={(e) =>
-                    handleArrayChange(
-                      "previousAddresses",
-                      idx,
-                      "startDate",
-                      e.target.value
-                    )
-                  }
-                  required
-                  style={styles.dateInput}
-                />
-                <input
-                  type="date"
-                  value={addr.endDate}
-                  onChange={(e) =>
-                    handleArrayChange(
-                      "previousAddresses",
-                      idx,
-                      "endDate",
-                      e.target.value
-                    )
-                  }
-                  required
-                  style={styles.dateInput}
-                />
-                {form.previousAddresses.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removePreviousAddress(idx)}
-                    style={styles.removeBtn}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addPreviousAddress}
-            style={styles.addBtn}
-          >
-            + Add Previous Address
-          </button>
-        </fieldset>
-
-        {/* Government Positions */}
-        <fieldset style={styles.fieldset}>
-          <legend>5. Government positions held</legend>
-          {form.govtPositions.map((pos, idx) => (
-            <div key={idx} style={styles.previousAddressBlock}>
-              <input
-                type="text"
-                placeholder="Position"
-                value={pos.position}
-                onChange={(e) =>
-                  handleArrayChange(
-                    "govtPositions",
-                    idx,
-                    "position",
-                    e.target.value
-                  )
-                }
-                style={styles.textarea}
-              />
-              <div style={styles.dateRow}>
-                <input
-                  type="date"
-                  value={pos.startDate}
+                  type="text"
+                  placeholder="Position"
+                  value={pos.position}
                   onChange={(e) =>
                     handleArrayChange(
                       "govtPositions",
                       idx,
-                      "startDate",
+                      "position",
                       e.target.value
                     )
                   }
-                  style={styles.dateInput}
+                  style={styles.textarea}
                 />
-                <input
-                  type="date"
-                  value={pos.endDate}
-                  onChange={(e) =>
-                    handleArrayChange(
-                      "govtPositions",
-                      idx,
-                      "endDate",
-                      e.target.value
-                    )
-                  }
-                  style={styles.dateInput}
-                />
-                {form.govtPositions.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeGovtPosition(idx)}
-                    style={styles.removeBtn}
-                  >
-                    Remove
-                  </button>
-                )}
+                <div style={styles.dateRow}>
+                  <input
+                    type="date"
+                    value={pos.startDate}
+                    onChange={(e) =>
+                      handleArrayChange(
+                        "govtPositions",
+                        idx,
+                        "startDate",
+                        e.target.value
+                      )
+                    }
+                    style={styles.dateInput}
+                  />
+                  <input
+                    type="date"
+                    value={pos.endDate}
+                    onChange={(e) =>
+                      handleArrayChange(
+                        "govtPositions",
+                        idx,
+                        "endDate",
+                        e.target.value
+                      )
+                    }
+                    style={styles.dateInput}
+                  />
+                  {form.govtPositions.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeGovtPosition(idx)}
+                      style={styles.removeBtn}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-          <button type="button" onClick={addGovtPosition} style={styles.addBtn}>
-            + Add Government Position
+            ))}
+            <button
+              type="button"
+              onClick={addGovtPosition}
+              style={styles.addBtn}
+            >
+              + Add Government Position
+            </button>
+          </fieldset>
+
+          {/* Resignation */}
+          <label>
+            9. Have you resigned from any positions?
+            <input
+              type="checkbox"
+              checked={form.resignedPositions}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  resignedPositions: e.target.checked,
+                }))
+              }
+            />
+          </label>
+          {form.resignedPositions && (
+            <textarea
+              placeholder="Resignation details"
+              value={form.resignationDetails}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  resignationDetails: e.target.value,
+                }))
+              }
+              style={styles.textarea}
+            />
+          )}
+
+          {/* Solemn Oath */}
+          <fieldset style={styles.fieldset}>
+            <legend>
+              Solemn Oath <span style={styles.required}>*</span>
+            </legend>
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={form.solemnOathName}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, solemnOathName: e.target.value }))
+              }
+              style={styles.textarea}
+            />
+            <input
+              type="text"
+              placeholder="Signature"
+              value={form.solemnOathSignature}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  solemnOathSignature: e.target.value,
+                }))
+              }
+              style={styles.textarea}
+            />
+            <input
+              type="date"
+              value={form.solemnOathDate}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, solemnOathDate: e.target.value }))
+              }
+              style={styles.dateInput}
+            />
+            <input
+              type="text"
+              placeholder="Place"
+              value={form.solemnOathPlace}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  solemnOathPlace: e.target.value,
+                }))
+              }
+              style={styles.textarea}
+            />
+          </fieldset>
+
+          {/* Messages */}
+          {error && <p style={styles.error}>{error}</p>}
+          {message && <p style={styles.success}>{message}</p>}
+
+          <button type="submit" disabled={loading} style={styles.submitButton}>
+            {loading ? "Submitting..." : "Submit Questionnaire"}
           </button>
-        </fieldset>
-
-        {/* Resignation */}
-        <label>
-          Have you resigned from any positions?
-          <input
-            type="checkbox"
-            checked={form.resignedPositions}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                resignedPositions: e.target.checked,
-              }))
-            }
+        </form>
+      ) : (
+        <div>
+          <CandidateFinancialDisclosureForm
+            userId={user.id}
+            onSubmitSuccess={onSubmitSuccess}
           />
-        </label>
-        {form.resignedPositions && (
-          <textarea
-            placeholder="Resignation details"
-            value={form.resignationDetails}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                resignationDetails: e.target.value,
-              }))
-            }
-            style={styles.textarea}
-          />
-        )}
-
-        {/* Solemn Oath */}
-        <fieldset style={styles.fieldset}>
-          <legend>
-            Solemn Oath <span style={styles.required}>*</span>
-          </legend>
-          <input
-            type="text"
-            placeholder="Full Name"
-            value={form.solemnOathName}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, solemnOathName: e.target.value }))
-            }
-            style={styles.textarea}
-          />
-          <input
-            type="text"
-            placeholder="Signature"
-            value={form.solemnOathSignature}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                solemnOathSignature: e.target.value,
-              }))
-            }
-            style={styles.textarea}
-          />
-          <input
-            type="date"
-            placeholder="Date"
-            value={form.solemnOathDate}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, solemnOathDate: e.target.value }))
-            }
-            style={styles.dateInput}
-          />
-          <input
-            type="text"
-            placeholder="Place"
-            value={form.solemnOathPlace}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, solemnOathPlace: e.target.value }))
-            }
-            style={styles.textarea}
-          />
-        </fieldset>
-
-        {/* Messages */}
-        {error && <p style={styles.error}>{error}</p>}
-        {message && <p style={styles.success}>{message}</p>}
-
-        <button type="submit" disabled={loading} style={styles.submitButton}>
-          {loading ? "Submitting..." : "Submit Questionnaire"}
-        </button>
-      </form>
+        </div>
+      )}
     </div>
   );
 }
